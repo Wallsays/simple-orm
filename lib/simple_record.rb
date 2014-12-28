@@ -2,8 +2,6 @@ require_relative 'config'
 require_relative 'string'
 require_relative 'object'
 
-
-
 #-------------
 ## CLASS API
 #-------------
@@ -16,14 +14,14 @@ class SimpleRecord
 
 
   def self.find(id)
+    return nil if id.blank?
     query = "select * from #{table_name} where id=#{id} limit 1"
     result = self.new
-    query_result = @@db.execute(query).first
-    query_result.each do |k, v|
+    @@db.execute(query).first.try(:each) do |k, v|
       next if k.is_a? Integer
       result.instance_variable_set('@' + k, v)
-    end if query_result
-    return "Record not found" if result.id.nil?
+    end
+    return "Record not found" if result.id.blank?
     result
   end
 
@@ -40,10 +38,9 @@ class SimpleRecord
     end.join(' ') if args.class == Hash
     result = []
     query = "select * from #{table_name} where #{args}" 
-    # p query
-    sample = self.new
     query_result = @@db.execute(query)
     query_result.each do |row|
+      sample = self.new
       row.each do |k, v|
         next if k.is_a? Integer
         hash = ''
@@ -61,11 +58,17 @@ class SimpleRecord
   end
 
   def save
-    if id.is_a? Integer
-      query = "UPDATE #{self.class.table_name} set #{name_vals} where id=#{self.id}"
+    if !id.blank?
+      return self if (nv = name_vals).blank?
+
+      query = "UPDATE #{table_name} set #{name_vals} where id=#{self.id}"
       @@db.execute(query)
     else
-      query = "INSERT INTO #{self.class.table_name} (#{attrs_names}) VALUES (#{attrs_vals})"
+      query = if instance_variables.any? {|v| v != :@id}
+                "INSERT INTO #{table_name} (#{attrs_names}) VALUES (#{attrs_vals})"
+              else
+                "INSERT INTO #{table_name} DEFAULT VALUES"
+              end
       @@db.execute(query)
       self.id = @@db.last_insert_row_id
     end
@@ -73,8 +76,8 @@ class SimpleRecord
   end
 
   def destroy
-    return "Record w/o id (not saved yet)" if !self.id
-    query = "DELETE from #{self.class.table_name} WHERE id=#{self.id}"
+    return "Record w/o id (not saved yet)" if self.id.blank?
+    query = "DELETE from #{table_name} WHERE id=#{self.id}"
     @@db.execute(query)
   end
 
@@ -118,47 +121,46 @@ class SimpleRecord
     end
   end
 
-  def self.has_one(fclass_name)
+  def self.one_to_one_assoc_with(fclass_name)
     fclass_name = fclass_name.to_s unless fclass_name.is_a? String
 
     self.send(:define_method, "#{fclass_name}=".to_sym) do |val|
       instance_variable_set("@" + fclass_name + '_id', val.id)
-      return if val.instance_variable_get("@#{self.class.to_s.downcase}_id") == self.id
+      return self if val.instance_variable_get("@#{self.class.to_s.downcase}_id") == self.id
       val.send("#{self.class.to_s.downcase}=".to_sym, self)
     end
 
     self.send(:define_method, fclass_name.to_sym) do
       fk = instance_variable_get('@' + fclass_name + '_id')
-      fclass_name.capitalize.to_const.find(fk) unless fk.blank? 
+      fclass_name.to_class.find(fk) unless fk.blank? 
     end
   end
 
-  def self.has_many_assoc_with(fclass_name, dep_destroy = false)
+  def self.has_many_assoc_with(fclass_name, options = {})
     fclass_name = fclass_name.to_s unless fclass_name.is_a? String
-    fclass = fclass_name.capitalize.to_const
 
-    send(:define_method, fclass.plural_setter_name.to_sym) do |vals|
+    send(:define_method, fclass_name.plural_setter_name.to_sym) do |vals|
       vals.map {|v| v.send(self.setter_name.to_sym, self); v.save}
     end
 
-    send(:define_method, fclass.plural_getter_name.to_sym) do
-      fclass.where(self.id_key_name.to_sym => self.id)
+    send(:define_method, fclass_name.plural_getter_name.to_sym) do
+      fclass_name.to_class.where(self.id_key_name.to_sym => self.id)
     end
 
-    add_dependence_destroy_on(fclass) if dep_destroy
+    add_dependence_destroy_on(fclass_name) if (options.blank? || options[:dependence_destroy]) 
   end
 
   def self.one_of_assoc_with(fclass_name, dep_destroy = false)
     fclass_name = fclass_name.to_s unless fclass_name.is_a? String
-    fclass = fclass_name.capitalize.to_const
 
     class_eval do
-      define_method fclass.setter_name.to_sym do |val|
-        instance_variable_set fclass.inst_var_name, val
+      define_method fclass_name.setter_name.to_sym do |val|
+        instance_variable_set fclass_name.id_var_name, val.id
       end
 
-      define_method fclass.getter_name.to_sym do
-        instance_variable_get fclass.inst_var_name
+      define_method fclass_name.getter_name.to_sym do
+        target_id = instance_variable_get(fclass_name.id_var_name)
+        fclass_name.to_class.find(target_id) unless target_id.blank?
       end
     end
   end
@@ -204,12 +206,17 @@ class SimpleRecord
   end
 
   def self.add_dependence_destroy_on dep_class
+    dep_class = dep_class.to_s unless dep_class.is_a?(String)
+
     self.class_eval do
-       before(:destroy) do
-         dep_class.where(self.id_key_name.to_sym => self.id).each do |inst|
-           inst.destroy
-         end
-       end
+      m = self.instance_method(:destroy)
+
+      define_method(:destroy) do |*args, &block|  
+        dep_class.to_class.where(self.id_key_name.to_sym => self.id).each do |inst|
+          inst.destroy
+        end
+        m.bind(self).(*args, &block)
+      end
     end
   end
 
@@ -243,38 +250,4 @@ class SimpleRecord
     self.name.downcase + '_id'
   end
    
-end
-
-
-
-
-# ******************************** DEBUGGING ********************************
-
-require_relative "../spec/helpers/models/student"
-
-db = SQLite3::Database.new "../db/dev.db"
-
-p '---------- BEFORE -----------'
-db.execute( "select * from students" ) do |row|
-  p row
-end
-
-# p '============ CRITICAL SECTION ==========='
-# p stud = Student.new
-# p stud.save
-# p stud.destroy
-# p st = Student.find(15)
-# st.name = "WOWA#{rand(10)}"
-# st.email = "#{st.name}@mail.com"
-# st.save
-# p st = Student.where(" id >= 2 AND (options != '{}' OR email == 'testBBB@mail.com') ")
-# p st = Student.where( options: {}, __op__: 'AND', email: 'testBBB@mail.com')
-# p st = Student.where( options: {}, __op__: 'OR', email: 'testBBB@mail.com')
-# p st = Student.where( options: {}, __op__: 'AND', 'email.ne' => 'testBBB@mail.com')
-# p '========================================='
-
-
-p '---------- AFTER -----------'
-db.execute( "select * from students" ) do |row|
-  p row
 end

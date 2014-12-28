@@ -1,7 +1,8 @@
 class Student < SimpleRecord
   attr_accessor :email, :name, :options
 
-  has_one :room
+  one_to_one_assoc_with :room
+  one_of_assoc_with :course
 
   def initialize(name = 'testBBB', email = 'testBBB@mail.com', options = {} )
     @name = name
