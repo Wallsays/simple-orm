@@ -26,6 +26,7 @@ class SimpleRecord
   end
 
   def self.where(args)
+    # p args
     # args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
     args = args.map do |k,v| 
       if k == :__op__
@@ -38,6 +39,7 @@ class SimpleRecord
     end.join(' ') if args.class == Hash
     result = []
     query = "select * from #{table_name} where #{args}" 
+    # p query
     query_result = @@db.execute(query)
     query_result.each do |row|
       sample = self.new
