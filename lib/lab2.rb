@@ -1,16 +1,7 @@
-require "sqlite3"
+require_relative 'config'
 
 # Open a database
-db = SQLite3::Database.new "test.db" 
-
-# studs = db.execute <<-SQL
-#  create table students (
-#     id  integer PRIMARY KEY,
-#     name varchar(30),
-#     email varchar(30),
-#     options varchar(256)
-#   );
-# SQL
+db = SimpleORM.db
 
 # # Find a few rows
 p '---------- BEFORE -----------'
@@ -23,7 +14,7 @@ end
 #-------------
 class SimpleRecord
   
-  @@db = SQLite3::Database.new "test.db" 
+  @@db = SimpleORM.db
   
   attr_accessor :id
 
@@ -109,7 +100,7 @@ class Student < SimpleRecord
 end
 
 
-p '============ CRITICAL SECTION ==========='
+# p '============ CRITICAL SECTION ==========='
 # p stud = Student.new
 # p stud.save
 # p stud.destroy
@@ -117,9 +108,9 @@ p '============ CRITICAL SECTION ==========='
 # st.name = "WOWA#{rand(10)}"
 # st.email = "#{st.name}@mail.com"
 # st.save
-p st = Student.where(" id >= 2 AND (options != '{}' OR email == 'testBBB@mail.com') ")
-p st = Student.where( options: {}, email: 'testBBB@mail.com') # { :_and => {id: 2, _or: {options: {}, email: {_not: "testBBB@mail.com"} }} }
-p '========================================='
+# p st = Student.where(" id >= 2 AND (options != '{}' OR email == 'testBBB@mail.com') ")
+# p st = Student.where( options: {}, email: 'testBBB@mail.com') # { :_and => {id: 2, _or: {options: {}, email: {_not: "testBBB@mail.com"} }} }
+# p '========================================='
 
 
 p '---------- AFTER -----------'

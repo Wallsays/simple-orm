@@ -5,7 +5,7 @@ require 'version'
 
 Gem::Specification.new do |spec|
   spec.name          = "simple_orm"
-  spec.version       = SimpleORM::VERSION
+  spec.version       = "0.0.1" #SimpleORM::VERSION
   spec.authors       = ["Denis D., Chimit N."]
   spec.email         = ["laba2_level_project@gmail.com"]
   spec.summary       = %q{Provides ActiveRecord-like generic, core functionalities.}
