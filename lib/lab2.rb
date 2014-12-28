@@ -36,6 +36,7 @@ end
 class SimpleRecord
   
   @@db = SimpleORM.db
+  @@db.results_as_hash = true
   
   attr_accessor :id
 
@@ -43,26 +44,44 @@ class SimpleRecord
   def self.find(id)
     query = "select * from #{table_name} where id=#{id} limit 1"
     result = self.new
-    @@db.execute(query).first.each do |k, v|
+    query_result = @@db.execute(query).first
+    query_result.each do |k, v|
       next if k.is_a? Integer
       result.instance_variable_set('@' + k, v)
       #result.send("#{k.to_s}=".to_sym, v)
-    end
+    end if query_result
     return "Record not found" if result.id.nil?
     result
   end
 
   def self.where(args)
-    p args
+    # p args
     args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
     result = []
     query = "select * from #{table_name} where #{args}" 
-    p query
-    @@db.execute(query) do |row|
-      tmp = self.new(row[1], row[2], row[3])
-      tmp.id = row[0]
-      result << tmp
-    end
+    # p query
+    # @@db.execute(query) do |row|
+    #   tmp = self.new(row[1], row[2], row[3])
+    #   tmp.id = row[0]
+    #   result << tmp
+    # end
+    sample = self.new
+    query_result = @@db.execute(query)
+    query_result.each do |row|
+      row.each do |k, v|
+        next if k.is_a? Integer
+        hash = ''
+        begin 
+          hash = eval(v) 
+        rescue
+        end
+        v = hash if hash.is_a?(Hash)
+        sample.instance_variable_set('@' + k, v)
+        #result.send("#{k.to_s}=".to_sym, v)
+      end 
+      result << sample
+      # p sample
+    end  if query_result
     return "Record not found" if !result
     result
   end
