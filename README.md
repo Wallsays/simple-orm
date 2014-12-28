@@ -2,6 +2,12 @@
 
 Provides rails-like utilities and functionality for quering db, perfoming CRUD operations and declaring one-to-one, one-to-many, many-to-one relations.
 
+## INB4
+
+Not a gem yet.
+Core - lab2.rb (run from lib folder)
+Testing - 'rspec simple_record_spec.rb' (run from spec folder)
+
 ## Installation/Usage
 
 Clone this repo. You can work with the gem locally by either:

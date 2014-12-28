@@ -1,5 +1,6 @@
 require_relative "spec_helper"
 require_relative "../lib/lab2.rb"
+require_relative "helpers/models/student"
 
 RSpec.describe "SimpleRecord" do
 

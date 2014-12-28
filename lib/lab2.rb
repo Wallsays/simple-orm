@@ -1,34 +1,8 @@
 require_relative 'config'
+require_relative 'string'
+require_relative 'object'
 
-Object.class_eval do
-  def blank?
-    self.nil? || (self.class.method_defined?(:size) && self.size == 0)
-  end
 
-end
-
-String.class_eval do
-  def to_plural
-    self + 's'
-  end
-
-  def to_single
-    self[-1] = '' if (self.size > 0) && (self[-1] == 's')
-  end
-
-  def to_const
-    Kernel.const_get(self)
-  end
-end
-
-# Open a database
-db = SimpleORM.db
-
-# # Find a few rows
-p '---------- BEFORE -----------'
-db.execute( "select * from students" ) do |row|
-  p row
-end
 
 #-------------
 ## CLASS API
@@ -48,23 +22,15 @@ class SimpleRecord
     query_result.each do |k, v|
       next if k.is_a? Integer
       result.instance_variable_set('@' + k, v)
-      #result.send("#{k.to_s}=".to_sym, v)
     end if query_result
     return "Record not found" if result.id.nil?
     result
   end
 
   def self.where(args)
-    # p args
     args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
     result = []
     query = "select * from #{table_name} where #{args}" 
-    # p query
-    # @@db.execute(query) do |row|
-    #   tmp = self.new(row[1], row[2], row[3])
-    #   tmp.id = row[0]
-    #   result << tmp
-    # end
     sample = self.new
     query_result = @@db.execute(query)
     query_result.each do |row|
@@ -77,10 +43,8 @@ class SimpleRecord
         end
         v = hash if hash.is_a?(Hash)
         sample.instance_variable_set('@' + k, v)
-        #result.send("#{k.to_s}=".to_sym, v)
       end 
       result << sample
-      # p sample
     end  if query_result
     return "Record not found" if !result
     result
@@ -271,21 +235,19 @@ class SimpleRecord
    
 end
 
-#-------------
-## TEST CLASS
-#-------------
-class Student < SimpleRecord
-  attr_accessor :email, :name, :options
 
-  has_one :room
 
-  def initialize(name = 'testBBB', email = 'testBBB@mail.com', options = {} )
-    @name = name
-    @email = email
-    @options = options.to_s
-  end
-end
 
+
+# ******************************** DEBUGGING ********************************
+
+# db = SimpleORM.db
+# db.results_as_hash = false
+
+# p '---------- BEFORE -----------'
+# db.execute( "select * from students" ) do |row|
+#   p row
+# end
 
 # p '============ CRITICAL SECTION ==========='
 # p stud = Student.new
@@ -300,7 +262,7 @@ end
 # p '========================================='
 
 
-p '---------- AFTER -----------'
-db.execute( "select * from students" ) do |row|
-  p row
-end
+# p '---------- AFTER -----------'
+# db.execute( "select * from students" ) do |row|
+#   p row
+# end
