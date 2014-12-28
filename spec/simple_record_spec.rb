@@ -55,7 +55,7 @@ RSpec.describe "SimpleRecord" do
       end
 
       it "where with 2 parameters" do
-        studs = Student.where( options: {}, name: 'alex' )
+        studs = Student.where( options: {}, __op__: 'AND', name: 'alex' )
         expect(studs.size).to eq 1
         expect(studs.first.name == 'alex').to eq true
         expect(studs.first.options == {} ).to eq true

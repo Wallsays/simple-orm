@@ -28,9 +28,19 @@ class SimpleRecord
   end
 
   def self.where(args)
-    args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
+    # args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
+    args = args.map do |k,v| 
+      if k == :__op__
+        "#{v}" 
+      elsif k.to_s.include?('.')
+        "#{k[0..k.length-4]} != '#{v}'"
+      else  
+        "#{k} == '#{v}'"
+      end
+    end.join(' ') if args.class == Hash
     result = []
     query = "select * from #{table_name} where #{args}" 
+    # p query
     sample = self.new
     query_result = @@db.execute(query)
     query_result.each do |row|
@@ -238,16 +248,16 @@ end
 
 
 
-
 # ******************************** DEBUGGING ********************************
 
-# db = SimpleORM.db
-# db.results_as_hash = false
+require_relative "../spec/helpers/models/student"
 
-# p '---------- BEFORE -----------'
-# db.execute( "select * from students" ) do |row|
-#   p row
-# end
+db = SQLite3::Database.new "../db/dev.db"
+
+p '---------- BEFORE -----------'
+db.execute( "select * from students" ) do |row|
+  p row
+end
 
 # p '============ CRITICAL SECTION ==========='
 # p stud = Student.new
@@ -258,11 +268,13 @@ end
 # st.email = "#{st.name}@mail.com"
 # st.save
 # p st = Student.where(" id >= 2 AND (options != '{}' OR email == 'testBBB@mail.com') ")
-# p st = Student.where( options: {}, email: 'testBBB@mail.com') # { :_and => {id: 2, _or: {options: {}, email: {_not: "testBBB@mail.com"} }} }
+# p st = Student.where( options: {}, __op__: 'AND', email: 'testBBB@mail.com')
+# p st = Student.where( options: {}, __op__: 'OR', email: 'testBBB@mail.com')
+# p st = Student.where( options: {}, __op__: 'AND', 'email.ne' => 'testBBB@mail.com')
 # p '========================================='
 
 
-# p '---------- AFTER -----------'
-# db.execute( "select * from students" ) do |row|
-#   p row
-# end
+p '---------- AFTER -----------'
+db.execute( "select * from students" ) do |row|
+  p row
+end
