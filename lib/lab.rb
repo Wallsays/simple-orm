@@ -1,7 +1,11 @@
 require_relative 'simple_record'
 require_relative "../spec/helpers/models/room"
 require_relative "../spec/helpers/models/course"
+require_relative "../spec/helpers/models/group"
 require_relative "../spec/helpers/models/student"
+require_relative "../spec/helpers/models/tyre"
+require_relative "../spec/helpers/models/vehicle"
+require_relative "../spec/helpers/models/important_part"
 
 # ******************************** DEBUGGING ********************************
 
@@ -11,13 +15,26 @@ db = SQLite3::Database.new "../db/dev.db"
 SimpleORM.db.execute <<-SQL
  DELETE FROM students;
 SQL
-SimpleORM.db.execute <<-SQL
+
+db.execute <<-SQL
  DELETE FROM rooms;
 SQL
-SimpleORM.db.execute <<-SQL
+
+db.execute <<-SQL
  DELETE FROM courses;
 SQL
 
+db.execute <<-SQL
+ DELETE FROM tyres;
+SQL
+
+db.execute <<-SQL
+ DELETE FROM vehicles;
+SQL
+
+db.execute <<-SQL
+ DELETE FROM important_parts;
+SQL
 # p '---------- BEFORE -----------'
 # db.execute( "select * from students" ) do |row|
 #   p row
@@ -42,7 +59,7 @@ SQL
 #   p row
 # end
 
-p '---One-To-One and Has-Many, One-of association test---'
+p '--- Many-To-One association test---'
 
 st1 = Student.new.save
 st2 = Student.new.save
@@ -75,4 +92,37 @@ c.destroy
 p ('Dependence destroy: c is destroyed, st1, st2, st3 should be also destroyed: ' + [Student.find(st1.id), Student.find(st2.id), Student.find(st3.id)].inspect)
 p ('Dependence destroy: c is destroyed, st1, st2, st3 should be also destroyed: ' + [st1, st2, st3].inspect)
 
+st1 = Student.new.save
+st2 = Student.new.save
+g = Group.new.save
+
+g.students = [st1, st2]
+st1.destroy
+p ('Test dep_destroy: st1 was destroyed, c must be destroyed too: ' + Group.find(g.id).inspect)
+p '------------------------------------------------------'
+
+p '--- Many-To-One association test---'
+t1 = Tyre.new.save
+t2 = Tyre.new.save
+p (v = Vehicle.new.save).inspect
+
+v.tyres = [t1, t2]
+v.save
+p ('Check v.tyres=: ' + v.tyres.inspect)
+p ('Check t1.vehicle: ' + t1.vehicle.inspect)
+
+p ('Check v.tyres persistent: ' + Vehicle.find(v.id).tyres.inspect)
+p ('Check t1.vehicle persistent: ' + Tyre.find(t1.id).vehicle.inspect)
+
+v.destroy
+p ('Check dep_destroy, v destroyed, t1, t2 must be also: ' + [Tyre.find(t1.id).inspect, Tyre.find(t2.id)].inspect)
+
+v = Vehicle.new.save
+ip = ImportantPart.new.save
+
+v.important_parts = [ip]
+v.save
+
+ip.destroy
+p ('Check dep_destroy backward, ip destroyed, v must be destroyed: ' + Vehicle.find(v.id).inspect)
 p '------------------------------------------------------'

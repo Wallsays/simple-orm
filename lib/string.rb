@@ -1,4 +1,16 @@
 String.class_eval do
+  def camelize
+    self.split('_').map(&:capitalize).join
+  end
+
+  def underscore
+    word = self.to_s.dup
+    word.gsub!(/([A-Z\d]+)([A-Z][a-z])/,'\1_\2')
+    word.gsub!(/([a-z\d])([A-Z])/,'\1_\2')
+    word.downcase!
+    word
+  end
+
   def to_plural
     self + 's'
   end
@@ -12,31 +24,31 @@ String.class_eval do
   end
 
   def to_class
-    self.capitalize.to_const
+    self.camelize.to_const
   end
 
   def setter_name
-    self.downcase + '='
+    self.underscore + '='
   end
 
   def getter_name
-    self.downcase
+    self.underscore
   end
 
   def plural_setter_name
-    self.downcase.to_plural + '='
+    self.underscore.to_plural + '='
   end
 
   def plural_getter_name
-    self.downcase.to_plural
+    self.underscore.to_plural
   end
 
   def inst_var_name
-    '@' + self.downcase
+    '@' + self.underscore
   end
 
   def id_key_name
-    self.downcase + '_id'
+    self.underscore + '_id'
   end
 
   def id_var_name

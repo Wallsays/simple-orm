@@ -45,11 +45,7 @@ class SimpleRecord
       sample = self.new
       row.each do |k, v|
         next if k.is_a? Integer
-        hash = ''
-        begin 
-          hash = eval(v) 
-        rescue
-        end
+        hash = eval(v) if (v.is_a?(String) && v[0] == '{')
         v = hash if hash.is_a?(Hash)
         sample.instance_variable_set('@' + k, v)
       end 
@@ -87,7 +83,7 @@ class SimpleRecord
   ## HELPERS
   #-------------
   def self.table_name
-    self.name.downcase.to_plural
+    self.name.underscore.to_plural
   end
 
   def table_name
@@ -138,7 +134,7 @@ class SimpleRecord
     end
   end
 
-  def self.has_many_assoc_with(fclass_name, options = {})
+  def self.many_to_one_backward_assoc_with(fclass_name, options = {})
     fclass_name = fclass_name.to_s unless fclass_name.is_a? String
 
     send(:define_method, fclass_name.plural_setter_name.to_sym) do |vals|
@@ -149,10 +145,10 @@ class SimpleRecord
       fclass_name.to_class.where(self.id_key_name.to_sym => self.id)
     end
 
-    add_dependence_destroy_on(fclass_name) if (options.blank? || options[:dependence_destroy]) 
+    set_many_to_one_backward_dep_destroy(fclass_name) if (!options.blank? || options[:dep_destroy]) 
   end
 
-  def self.one_of_assoc_with(fclass_name, dep_destroy = false)
+  def self.many_to_one_forward_assoc_with(fclass_name, options = {})
     fclass_name = fclass_name.to_s unless fclass_name.is_a? String
 
     class_eval do
@@ -165,6 +161,63 @@ class SimpleRecord
         fclass_name.to_class.find(target_id) unless target_id.blank?
       end
     end
+
+    set_many_to_one_forward_dep_destroy(fclass_name) if (!options.blank? || options[:dep_destroy])
+  end
+
+  def self.one_to_many_forward_assoc_with(fclass_name, options = {})
+    fclass_name = fclass_name.to_s unless fclass_name.is_a? String
+
+    class_eval do
+      define_method fclass_name.plural_setter_name.to_sym do |vals|
+        ids_str = serialize_ids vals.map(&:id)
+        instance_variable_set(fclass_name.id_var_name.to_plural, ids_str)
+      end
+
+      define_method fclass_name.plural_getter_name.to_sym do
+        ids_str = (instance_variable_get fclass_name.id_var_name.to_plural).to_s
+        deserialize_ids(ids_str).map do |f_id|
+          fclass_name.to_class.find(f_id)
+        end
+      end
+    end
+
+    set_one_to_many_forward_dep_destroy(fclass_name) if (!options.blank? || options[:dep_destroy])
+  end
+
+  def self.one_to_many_backward_assoc_with(fclass_name, options = {})
+    fclass_name = fclass_name.to_s unless fclass_name.is_a? String
+
+    class_eval do
+      define_method fclass_name.setter_name.to_sym do |val|
+        ids = deserialize(val.instance_val_get self.id_var_name) << self.id
+        val.instance_variable_set self.id_var_name.to_plural, serialize_ids(ids)
+      end
+
+      define_method fclass_name.getter_name.to_sym do
+        q = self.id_key_name.to_plural + ' LIKE \'%|' + self.id.to_s + '|%\''
+        fclass_name.to_class.where(q).first
+      end
+    end
+
+
+    set_one_to_many_backward_dep_destroy(fclass_name) if (!options.blank? || options[:dep_destroy])
+  end
+
+  def serialize_ids(ids_arr)
+    self.class.serialize_ids ids_arr
+  end
+
+  def self.serialize_ids(ids_arr)
+    ids_arr.map {|v| "|" + v.to_s + "|"}.join(' ')
+  end
+
+  def deserialize_ids(str)
+    self.class.deserialize_ids str
+  end
+
+  def self.deserialize_ids(str)
+    str.split(' ').map {|v| v.gsub("|", '').to_i}
   end
 
   def inst_var_name
@@ -180,7 +233,7 @@ class SimpleRecord
   end
 
   def self.setter_name
-    self.name.downcase + '='
+    self.name.underscore + '='
   end
 
   def plural_setter_name
@@ -188,7 +241,7 @@ class SimpleRecord
   end
 
   def self.plural_setter_name
-    self.name.downcase.to_plural + '='
+    self.name.underscore.to_plural + '='
   end
 
   def getter_name
@@ -196,7 +249,7 @@ class SimpleRecord
   end
 
   def self.getter_name
-    self.name.downcase
+    self.name.underscore
   end
 
   def plural_getter_name
@@ -204,17 +257,17 @@ class SimpleRecord
   end
 
   def self.plural_getter_name
-    self.name.downcase.to_plural
+    self.name.underscore.to_plural
   end
 
-  def self.add_dependence_destroy_on dep_class
-    dep_class = dep_class.to_s unless dep_class.is_a?(String)
+  def self.set_many_to_one_backward_dep_destroy dep_class_name
+    dep_class_name = dep_class_name.to_s unless dep_class_name.is_a?(String)
 
     self.class_eval do
       m = self.instance_method(:destroy)
 
       define_method(:destroy) do |*args, &block|  
-        dep_class.to_class.where(self.id_key_name.to_sym => self.id).each do |inst|
+        dep_class_name.to_class.where(self.id_key_name.to_sym => self.id).each do |inst|
           inst.destroy
         end
         m.bind(self).(*args, &block)
@@ -222,6 +275,47 @@ class SimpleRecord
     end
   end
 
+  def self.set_many_to_one_forward_dep_destroy dep_class_name
+    dep_class_name = dep_class_name.to_s unless dep_class_name.is_a?(String)
+
+    self.class_eval do
+      m = instance_method(:destroy)
+
+      define_method(:destroy) do |*args, &block|  
+        dep_class = dep_class_name.to_class
+        dep_class_name.to_class.find(instance_variable_get dep_class.id_var_name).try(:destroy)
+        m.bind(self).(*args, &block)
+      end
+    end
+  end
+
+  def self.set_one_to_many_forward_dep_destroy dep_class_name
+    dep_class_name = dep_class_name.to_s unless dep_class_name.is_a?(String)
+    p ('set dep_destroy!!!')
+
+    self.class_eval do
+      m = instance_method(:destroy)
+
+      define_method(:destroy) do |*args, &block|  
+        p ('destroy!!!')
+        self.send(dep_class_name.plural_getter_name.to_sym).each {|d| d.destroy}
+        m.bind(self).(*args, &block)
+      end
+    end
+  end
+
+  def self.set_one_to_many_backward_dep_destroy dep_class_name
+    dep_class_name = dep_class_name.to_s unless dep_class_name.is_a?(String)
+
+    self.class_eval do
+      m = instance_method(:destroy)
+
+      define_method(:destroy) do |*args, &block|  
+        q = self.id_key_name.to_plural + ' LIKE \'%|' + self.id.to_s + '|%\''
+        dep_class_name.to_class.where(q).first.destroy
+      end
+    end
+  end
   def is_foreign_assigned?(fi)
     fi.has_fk_of? self
   end
@@ -249,7 +343,14 @@ class SimpleRecord
   end
 
   def self.id_key_name
-    self.name.downcase + '_id'
+    self.name.underscore + '_id'
+  end
+
+  def id_var_name
+    self.class.id_var_name
   end
    
+  def self.id_var_name
+    self.name.underscore.id_var_name
+  end
 end

@@ -1,5 +1,5 @@
 class Course < SimpleRecord
   attr_accessor :number
 
-  has_many_assoc_with :student, dependence_destroy: true
+  many_to_one_backward_assoc_with :student, dep_destroy: true
 end
