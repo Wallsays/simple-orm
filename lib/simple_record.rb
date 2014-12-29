@@ -55,6 +55,41 @@ class SimpleRecord
     result
   end
 
+   def self.where_proection(query, columns)
+    args = query
+    # args = args.map{|k,v| "#{k} == '#{v}'"}.join(' AND ') if args.class == Hash
+    args = args.map do |k,v| 
+      if k == :__op__
+        "#{v}" 
+      elsif k.to_s.include?('.')
+        "#{k[0..k.length-4]} != '#{v}'"
+      else  
+        "#{k} == '#{v}'"
+      end
+    end.join(' ') if args.class == Hash
+    result = []
+    query = "select * from #{table_name} where #{args}" 
+    # p query
+    query_result = @@db.execute(query)
+    query_result.each do |row|
+      sample = self.new
+      # p row
+      row.each do |k, v|
+        next if k.is_a? Integer
+        # p k
+        # p columns.map(&:to_s)
+        next if !columns.map(&:to_s).include?(k.to_s)
+        hash = eval(v) if (v.is_a?(String) && v[0] == '{')
+        v = hash if hash.is_a?(Hash)
+        sample.instance_variable_set('@' + k, v)
+      end 
+      result << sample
+    end  if query_result
+    return "Record not found" if !result
+    result
+  end
+
+
   def save
     if !id.blank?
       return self if (nv = name_vals).blank?

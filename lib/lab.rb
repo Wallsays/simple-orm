@@ -35,13 +35,20 @@ SQL
 db.execute <<-SQL
  DELETE FROM important_parts;
 SQL
+
+ %w(alex roman roman sally).each do |name|
+        stud = Student.new(name, "#{name}@mail.com")
+        stud.options = {a: rand(10)}
+        stud.save
+      end
+
 # p '---------- BEFORE -----------'
 # db.execute( "select * from students" ) do |row|
 #   p row
 # end
 
 # p '============ CRITICAL SECTION ==========='
-# p stud = Student.new
+# p stud = Student.new('alex')
 # p stud.save
 # p stud.destroy
 # p st = Student.find(15)
@@ -123,6 +130,17 @@ ip = ImportantPart.new.save
 v.important_parts = [ip]
 v.save
 
+
 ip.destroy
 p ('Check dep_destroy backward, ip destroyed, v must be destroyed: ' + Vehicle.find(v.id).inspect)
 p '------------------------------------------------------'
+
+# p '---------- AFTER -----------'
+db.execute( "select * from students" ) do |row|
+  p row
+end
+
+p studs = Student.where_proection( {name: 'roman' }, [:name, :options] )
+
+
+
