@@ -3,6 +3,10 @@ require_relative "../lib/simple_record"
 require_relative "helpers/models/room"
 require_relative "helpers/models/student"
 require_relative "helpers/models/course"
+require_relative "helpers/models/group"
+require_relative "helpers/models/vehicle"
+require_relative "helpers/models/tyre"
+require_relative "helpers/models/important_part"
 
 RSpec.describe "SimpleRecord" do
 

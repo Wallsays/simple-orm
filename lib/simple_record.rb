@@ -291,13 +291,11 @@ class SimpleRecord
 
   def self.set_one_to_many_forward_dep_destroy dep_class_name
     dep_class_name = dep_class_name.to_s unless dep_class_name.is_a?(String)
-    p ('set dep_destroy!!!')
 
     self.class_eval do
       m = instance_method(:destroy)
 
       define_method(:destroy) do |*args, &block|  
-        p ('destroy!!!')
         self.send(dep_class_name.plural_getter_name.to_sym).each {|d| d.destroy}
         m.bind(self).(*args, &block)
       end
