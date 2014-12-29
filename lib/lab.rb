@@ -7,9 +7,14 @@ require_relative "../spec/helpers/models/student"
 
 db = SQLite3::Database.new "../db/dev.db"
 
-db.execute <<-SQL
+# --- Remove Records from all tables ---
+SimpleORM.db.execute <<-SQL
  DELETE FROM students;
+SQL
+SimpleORM.db.execute <<-SQL
  DELETE FROM rooms;
+SQL
+SimpleORM.db.execute <<-SQL
  DELETE FROM courses;
 SQL
 
